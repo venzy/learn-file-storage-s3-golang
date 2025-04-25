@@ -97,9 +97,17 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 	defer os.Remove(tempFile.Name())
 	defer tempFile.Close()
 
-	_, err = io.Copy(tempFile, uploadFile)
+	copySize, err := io.Copy(tempFile, uploadFile)
 	if err != nil {	
 		respondWithError(w, http.StatusInternalServerError, "Unable to copy file", err)
+		return
+	}
+
+	// Enforce size limit before transferring to S3
+	// TODO: It would be better to do this in a streaming manner at multipart
+	// form parsing time, assuming the uploader supplies a content-length
+	if copySize > maxUploadSize {
+		respondWithError(w, http.StatusBadRequest, "File too large", fmt.Errorf("upload_video: file size %d exceeds limit %d", copySize, maxUploadSize))
 		return
 	}
 
