@@ -1,6 +1,8 @@
 package main
 
 import (
+	"crypto/rand"
+	"encoding/base64"
 	"fmt"
 	"io"
 	"mime"
@@ -81,7 +83,13 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 		respondWithError(w, http.StatusInternalServerError, "Unrecognised Content-Type", fmt.Errorf("upload_thumbnail: unknown file extension for content type %s", contentType))
 	}
 
-	savePath := filepath.Join(cfg.assetsRoot, videoIDString + fileExtension)
+	randBytes := make([]byte, 32)
+	// Guaranteed not to return an error on all but legacy Linux systems
+	rand.Read(randBytes)
+	// Use base64.RawURLEncoding to get a URL-safe string
+	randString := base64.RawURLEncoding.EncodeToString(randBytes)
+	fileName := randString + fileExtension
+	savePath := filepath.Join(cfg.assetsRoot, fileName)
 
 	saveFile, err := os.Create(savePath)
 	if err != nil {
@@ -98,7 +106,7 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 
 	// Store path to file (handled by our assets file server)
 	// NOTE: You wouldn't normally hardcode the hostname like this
-	newURL := fmt.Sprintf("http://localhost:%s/assets/%s", cfg.port, videoIDString + fileExtension)
+	newURL := fmt.Sprintf("http://localhost:%s/assets/%s", cfg.port, fileName)
 	videoMeta.ThumbnailURL = &newURL
 	err = cfg.db.UpdateVideo(videoMeta)
 	if err != nil {
