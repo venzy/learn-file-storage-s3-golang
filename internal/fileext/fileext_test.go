@@ -1,0 +1,24 @@
+package fileext
+
+import "testing"
+
+func TestFromContentType(t *testing.T) {
+    tests := []struct {
+        contentType string
+        expected    string
+    }{
+        {"image/jpeg", ".jpg"},
+        {"image/png", ".png"},
+        {"image/gif", ".gif"},
+        {"image/webp", ""},
+        {"application/json", ""},
+        {"", ""},
+    }
+
+    for _, tt := range tests {
+        result := FromContentType(tt.contentType)
+        if result != tt.expected {
+            t.Errorf("FromContentType(%q) = %q; want %q", tt.contentType, result, tt.expected)
+        }
+    }
+}
