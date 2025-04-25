@@ -1,4 +1,4 @@
-module github.com/bootdotdev/learn-file-storage-s3-golang-starter
+module github.com/venzy/learn-file-storage-s3-golang
 
 go 1.23.0
 

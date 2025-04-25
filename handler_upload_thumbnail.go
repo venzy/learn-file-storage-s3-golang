@@ -5,7 +5,7 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/bootdotdev/learn-file-storage-s3-golang-starter/internal/auth"
+	"github.com/venzy/learn-file-storage-s3-golang/internal/auth"
 	"github.com/google/uuid"
 )
 
