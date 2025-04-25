@@ -16,7 +16,7 @@ func TestFromContentType(t *testing.T) {
     }
 
     for _, tt := range tests {
-        result := FromContentType(tt.contentType)
+        result := FromMediaType(tt.contentType)
         if result != tt.expected {
             t.Errorf("FromContentType(%q) = %q; want %q", tt.contentType, result, tt.expected)
         }

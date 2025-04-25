@@ -1,6 +1,6 @@
 package fileext
 
-func FromContentType(contentType string) string {
+func FromMediaType(contentType string) string {
 	switch contentType {
 	case "image/jpeg":
 		return ".jpg"

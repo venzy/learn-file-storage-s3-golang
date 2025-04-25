@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"io"
+	"mime"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -61,16 +62,23 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 	// `uploadFile` is an `io.Reader` that we can read from to get the image data
 
 	contentType := header.Header.Get("Content-Type")
-	if contentType != "image/jpeg" && contentType != "image/png" {
-		respondWithError(w, http.StatusBadRequest, "Invalid file type", fmt.Errorf("expected image/jpeg or image/png, got %s", contentType))
+	mediaType, _, err := mime.ParseMediaType(contentType)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "Unable to parse Content-Type", fmt.Errorf("upload_thumbnail: %s", err))
+		return
+	}
+	if mediaType != "image/jpeg" && contentType != "image/png" {
+		respondWithError(w, http.StatusBadRequest, "Invalid file type", fmt.Errorf("upload_thumbnail: expected image/jpeg or image/png, got %s", mediaType))
 		return
 	}
 
 	// Write uploaded data to a file in assets directory
-	fileExtension := fileext.FromContentType(contentType)
+	// NOTE: Could use mime.ExtensionsByType(mediaType) and pick the first one,
+	// but for now leave with our own little internal module
+	fileExtension := fileext.FromMediaType(mediaType)
 	if fileExtension == "" {
 		// This is an internal error, as we restrict the content types above to a subset of those understood by fileext
-		respondWithError(w, http.StatusInternalServerError, "Unrecognised Content-Type", fmt.Errorf("unknown file extension for content type %s", contentType))
+		respondWithError(w, http.StatusInternalServerError, "Unrecognised Content-Type", fmt.Errorf("upload_thumbnail: unknown file extension for content type %s", contentType))
 	}
 
 	savePath := filepath.Join(cfg.assetsRoot, videoIDString + fileExtension)
