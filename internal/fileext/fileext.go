@@ -8,6 +8,8 @@ func FromMediaType(contentType string) string {
 		return ".png"
 	case "image/gif":
 		return ".gif"
+	case "video/mp4":
+		return ".mp4"
 	default:
 		return ""
 	}

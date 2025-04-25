@@ -10,6 +10,7 @@ func TestFromContentType(t *testing.T) {
         {"image/jpeg", ".jpg"},
         {"image/png", ".png"},
         {"image/gif", ".gif"},
+        {"video/mp4", ".mp4"},
         {"image/webp", ""},
         {"application/json", ""},
         {"", ""},
