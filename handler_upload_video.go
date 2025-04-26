@@ -1,13 +1,17 @@
 package main
 
 import (
+	"bytes"
 	"crypto/rand"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"io"
+	"math"
 	"mime"
 	"net/http"
 	"os"
+	"os/exec"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -111,7 +115,23 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	tempFile.Seek(0, io.SeekStart) // Rewind the file
+	// Get the aspect ratio of the video
+	aspectRatio, err := getVideoAspectRatio(tempFile.Name())
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Unable to get video aspect ratio", err)
+		return
+	}
+
+	// Determine the storage prefix based on the aspect ratio
+	var storagePrefix string
+	switch aspectRatio {
+	case "16:9":
+		storagePrefix = "landscape/"
+	case "9:16":
+		storagePrefix = "portrait/"
+	default:
+		storagePrefix = "other/"
+	}
 
 	// Generate a random filename
 	randBytes := make([]byte, 32)
@@ -119,9 +139,10 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 	rand.Read(randBytes)
 	// Use base64.RawURLEncoding to get a URL-safe string
 	randString := base64.RawURLEncoding.EncodeToString(randBytes)
-	fileName := randString + fileExtension
+	fileName := storagePrefix + randString + fileExtension
 
 	// Upload to S3
+	tempFile.Seek(0, io.SeekStart) // Rewind the file
 	_, err = cfg.s3Client.PutObject(r.Context(), &s3.PutObjectInput{
 		Bucket: aws.String(cfg.s3Bucket),
 		Key:    aws.String(fileName),  // Use the filename directly as the key
@@ -145,4 +166,52 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 
 	// Respond with updated video metadata
 	respondWithJSON(w, http.StatusOK, videoMeta)
+}
+
+func getVideoAspectRatio(filePath string) (string, error) {
+	cmd := exec.Command("ffprobe", "-v", "error", "-print_format", "json", "-show_streams", filePath)
+	resultBuffer := bytes.Buffer{}
+	cmd.Stdout = &resultBuffer
+	err := cmd.Run()
+	if err != nil {
+		return "", fmt.Errorf("ffprobe error: %v", err)
+	}
+
+	// Just extract the first stream's width and height
+	type FFProbeResult struct {
+		Streams []struct {
+			Width  int `json:"width"`
+			Height int `json:"height"`
+		} `json:"streams"`
+	}
+	var ffprobeResult FFProbeResult
+
+	// Parse the JSON output to get the aspect ratio
+	err = json.Unmarshal(resultBuffer.Bytes(), &ffprobeResult)
+	if err != nil {	
+		return "", fmt.Errorf("json unmarshal error: %v", err)
+	}
+	if len(ffprobeResult.Streams) == 0 {
+		return "", fmt.Errorf("no streams found in ffprobe output")
+	}
+	width := ffprobeResult.Streams[0].Width
+	height := ffprobeResult.Streams[0].Height
+
+	if height == 0 {
+		return "", fmt.Errorf("height is zero, cannot calculate aspect ratio")
+	}
+
+	ratio := float64(width) / float64(height)
+
+	if isEqualWithTolerance(ratio, 1.778, 0.001) {
+		return "16:9", nil
+	} else if isEqualWithTolerance(ratio, 0.5625, 0.001) {
+		return "9:16", nil
+	} else {
+		return "other", nil
+	}
+}
+
+func isEqualWithTolerance(a, b, tolerance float64) bool {
+	return math.Abs(a - b) <= tolerance
 }
