@@ -170,17 +170,23 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	// Update the database with the S3 URL
-	s3URL := fmt.Sprintf("https://%s.s3.%s.amazonaws.com/%s", cfg.s3Bucket, cfg.s3Region, fileName)
-	videoMeta.VideoURL = &s3URL
+	// Update the database with components that will go into the video URL
+	partialURL := fmt.Sprintf("%s,%s", cfg.s3Bucket, fileName)
+	videoMeta.VideoURL = &partialURL
 	err = cfg.db.UpdateVideo(videoMeta)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Unable to update video", err)
 		return
 	}
 
+	presignedVideo, err := cfg.dbVideoToSignedVideo(videoMeta)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Couldn't generate presigned URL", err)
+		return
+	}
+
 	// Respond with updated video metadata
-	respondWithJSON(w, http.StatusOK, videoMeta)
+	respondWithJSON(w, http.StatusOK, presignedVideo)
 }
 
 func getVideoAspectRatio(filePath string) (string, error) {
